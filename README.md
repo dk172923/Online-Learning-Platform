@@ -99,3 +99,29 @@ The backend server will start on **PORT 5000** by default. You can adjust this s
 For further assistance or doubts, reach out to any team member listed above or find their GitHub ID from the collaborators list.
 
 ---
+
+---
+
+## Configuration & Deployment
+
+**Stack:** React (Vite) · Express · MongoDB Atlas · Cloudflare R2 (media) · Resend (emails) · Puppeteer (certificates) · custom JWT auth.
+
+### Environment variables
+- `server/.env` – copy from `server/.env.example` (MongoDB, JWT, Resend, R2, `SERVER_URL`, `CLIENT_URL`).
+- `Client/.env.local` – copy from `Client/.env.example` (`VITE_REACT_APP_BACKEND_BASEURL`).
+
+`.env` files are git-ignored. Never commit them.
+
+### Media uploads (Cloudflare R2)
+The browser uploads files directly to R2 using a presigned URL from `POST /storage/presign`, which avoids serverless body-size limits. After creating the bucket, run once:
+```bash
+cd server && node scripts/setup-r2-cors.js   # allows uploads from CLIENT_URL
+```
+
+### Deploying to Vercel (two projects from this repo)
+| Project | Root directory | Env vars |
+|---|---|---|
+| API | `server` | everything in `server/.env.example`, with `SERVER_URL` = API URL and `CLIENT_URL` = frontend URL |
+| Frontend | `Client` (Vite preset) | `VITE_REACT_APP_BACKEND_BASEURL` = API URL |
+
+In MongoDB Atlas, set Network Access to `0.0.0.0/0`, because Vercel IPs are dynamic.

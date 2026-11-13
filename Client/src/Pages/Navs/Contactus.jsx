@@ -15,7 +15,7 @@ function ContactUs() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    await axios.post('http://localhost:5000/api/contact', formData);
+    await axios.post(`${import.meta.env.VITE_REACT_APP_BACKEND_BASEURL}/api/contact`, formData);
     alert('Query submitted successfully');
   };
 

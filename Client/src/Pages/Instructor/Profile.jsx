@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
+import { uploadToR2 } from '../../utils/upload';
 import Sidebar from '../../Components/SideBar';
 
 const Profile = ({ onLogout }) => {
@@ -57,15 +58,11 @@ const Profile = ({ onLogout }) => {
       let updatedInstructor = { ...instructor };
 
       if (newImage) {
-        const formData = new FormData();
-        formData.append('image', newImage);
-        formData.append('email', email);
-
-        const response = await axios.post(`${import.meta.env.VITE_REACT_APP_BACKEND_BASEURL}/instructors/upload-profile-image`, formData, {
-          headers: { 'Content-Type': 'multipart/form-data',
-                     'x-auth-token': localStorage.getItem('instructorToken'),
-           },
-        });
+        const token = localStorage.getItem('instructorToken');
+        const imageUrl = await uploadToR2(newImage, 'instructor_profiles', token);
+        const response = await axios.post(`${import.meta.env.VITE_REACT_APP_BACKEND_BASEURL}/instructors/upload-profile-image`,
+          { email, imageUrl },
+          { headers: { 'x-auth-token': token } });
         updatedInstructor.imageUrl = response.data.imageUrl;
       }
 

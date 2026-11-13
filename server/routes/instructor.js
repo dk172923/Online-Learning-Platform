@@ -9,7 +9,6 @@ const User = require('../models/User');
 const Otp = require('../models/Otp');
 const transporter = require('../utils/email');
 const authMiddleware = require('../middleware/auth');
-const { upload, imageUpload, imageUploadProfile } = require('../utils/cloudinary');
 require('dotenv').config();
 
 const router = express.Router();
@@ -26,7 +25,7 @@ router.post('/signup', async (req, res) => {
         await instructor.save();
 
         // Send verification email
-        const verificationUrl = `http://localhost:5000/instructors/verify-email-instructor?token=${verificationToken}`;
+        const verificationUrl = `${process.env.SERVER_URL || "http://localhost:5000"}/instructors/verify-email-instructor?token=${verificationToken}`;
         await transporter.sendMail({
             to: email,
             subject: 'Verify Your Email',
@@ -167,11 +166,12 @@ router.put('/:instructorEmail', authMiddleware, async (req, res) => {
 });
 
 // API route for uploading profile image
-router.post('/upload-profile-image', authMiddleware, imageUploadProfile.single('image'), async (req, res) => {
-    if (!req.file) return res.status(400).send('No image uploaded');
+// Body: { email, imageUrl } - the image is uploaded to R2 first via /storage/presign
+router.post('/upload-profile-image', authMiddleware, async (req, res) => {
+    const { imageUrl } = req.body;
+    if (!imageUrl) return res.status(400).send('No image uploaded');
 
     try {
-        const imageUrl = req.file.path; // Cloudinary URL of the uploaded image
 
         // Update the instructor's profile with the image URL
         const instructorEmail = req.body.email;  // Assuming you are passing the instructor's email to identify them
@@ -305,26 +305,14 @@ router.put('/courses/:id', authMiddleware, async (req, res) => {
     }
 });
 
-// Video upload route using Cloudinary
-router.post('/upload-video', authMiddleware, upload.single('video'), (req, res) => {
-    if (!req.file) return res.status(400).send('No file uploaded');
+// Video/image files are uploaded straight to Cloudflare R2 via POST /storage/presign
 
-    // The Cloudinary URL and public ID are returned in req.file.path and req.file.filename
-    res.json({ url: req.file.path, publicId: req.file.filename });
-});
-
-// Image upload route using Cloudinary (new route)
-router.post('/upload-image',authMiddleware, imageUpload.single('image'), (req, res) => {
-    if (!req.file) return res.status(400).send('No file uploaded');
-    res.json({ url: req.file.path, publicId: req.file.filename });
-});
-
-// Update the Course creation route to accept video URLs from Cloudinary
+// Update the Course creation route to accept video URLs (Cloudflare R2)
 router.post('/create-course',authMiddleware, async (req, res) => {
     const { title, price, description, requirements, sections, instructorEmail, imageUrl } = req.body;
 
     try {
-        // Create a new course with Cloudinary URLs in the videoUrl field
+        // Create a new course with R2 URLs in the videoUrl field
         const course = new Course({
             title,
             price,
@@ -334,7 +322,7 @@ router.post('/create-course',authMiddleware, async (req, res) => {
             sections: sections.map((section) => ({
                 title: section.title,
                 description: section.description,
-                videoUrl: section.videoUrl, // Cloudinary URL for each video
+                videoUrl: section.videoUrl, // R2 URL for each video
             })),
             instructorEmail,
         });

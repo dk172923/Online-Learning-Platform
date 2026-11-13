@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { uploadToR2 } from '../../utils/upload';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import Sidebar from '../../Components/SideBar';
@@ -83,16 +84,9 @@ const EditCourse = ({ onLogout }) => {
 
   const handleImageUpload = async (file) => {
     setIsUploadingImage(true);
-    const formData = new FormData();
-    formData.append('image', file);
-
     try {
-      const response = await axios.post(`${import.meta.env.VITE_REACT_APP_BACKEND_BASEURL}/instructors/upload-image`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data',
-          'x-auth-token': localStorage.getItem('instructorToken'),
-         },
-      });
-      setCourseImageUrl(response.data.url);
+      const url = await uploadToR2(file, 'course_images', localStorage.getItem('instructorToken'));
+      setCourseImageUrl(url);
     } catch (error) {
       console.error("Error uploading image:", error);
     } finally {
@@ -107,16 +101,9 @@ const EditCourse = ({ onLogout }) => {
     setSections(updatedSections);
 
     try {
-      const formData = new FormData();
-      formData.append('video', file);
+      const url = await uploadToR2(file, 'course_videos', localStorage.getItem('instructorToken'));
 
-      const response = await axios.post(`${import.meta.env.VITE_REACT_APP_BACKEND_BASEURL}/instructors/upload-video`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data',
-          'x-auth-token': localStorage.getItem('instructorToken'),
-         },
-      });
-
-      updatedSections[index].videoUrl = response.data.url;
+      updatedSections[index].videoUrl = url;
       setSections(updatedSections);
     } catch (error) {
       console.error("Error uploading video:", error);

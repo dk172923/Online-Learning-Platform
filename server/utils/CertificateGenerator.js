@@ -1,9 +1,26 @@
-const puppeteer = require('puppeteer');
-const path = require('path');
+
+// On Vercel/AWS Lambda use the slim serverless Chromium; locally use full Puppeteer.
+async function launchBrowser() {
+  if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME) {
+    const chromium = require('@sparticuz/chromium');
+    const puppeteer = require('puppeteer-core');
+    return puppeteer.launch({
+      args: chromium.args,
+      defaultViewport: chromium.defaultViewport,
+      executablePath: await chromium.executablePath(),
+      headless: chromium.headless,
+    });
+  }
+  const puppeteer = require('puppeteer');
+  return puppeteer.launch({
+    headless: true,
+    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+  });
+}
 
 async function generateCertificate(userName, courseTitle, completionDate) {
   try {
-    const browser = await puppeteer.launch();
+    const browser = await launchBrowser();
     const page = await browser.newPage();
 
     const htmlContent = `
@@ -246,14 +263,14 @@ async function generateCertificate(userName, courseTitle, completionDate) {
       </html>
     `;
 
-    await page.setContent(htmlContent);
+    await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
     
     // Set viewport and PDF options to match design
     await page.setViewport({ width: 1100, height: 800 });
     
-    const certificatePath = path.join(__dirname, '../../server/certificates', `${userName}_${courseTitle}_certificate.pdf`);
-    await page.pdf({
-      path: certificatePath,
+    // Generated in memory: serverless file systems are read-only
+    const fileName = `${userName}_${courseTitle}_certificate.pdf`.replace(/[\/:*?"<>|]/g, '_');
+    const pdf = await page.pdf({
       width: '1100px',
       height: '800px',
       printBackground: true,
@@ -267,7 +284,7 @@ async function generateCertificate(userName, courseTitle, completionDate) {
     });
 
     await browser.close();
-    return certificatePath;
+    return { fileName, buffer: Buffer.from(pdf) };
   } catch (err) {
     throw new Error('Error generating certificate: ' + err.message);
   }

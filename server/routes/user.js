@@ -11,7 +11,6 @@ const transporter = require('../utils/email');
 const authMiddleware = require('../middleware/auth');
 const path = require('path');
 const { generateCertificate } = require('../utils/CertificateGenerator');
-const { imageUploadProfileUser } = require('../utils/cloudinary');
 require('dotenv').config();
 
 const router = express.Router();
@@ -29,7 +28,7 @@ router.post('/signup', async (req, res) => {
         await user.save();
 
         // Send verification email
-        const verificationUrl = `http://localhost:5000/users/verify-email?token=${verificationToken}`;
+        const verificationUrl = `${process.env.SERVER_URL || "http://localhost:5000"}/users/verify-email?token=${verificationToken}`;
         await transporter.sendMail({
             to: email,
             subject: 'Verify Your Email',
@@ -185,11 +184,12 @@ router.put('/student/:userEmail', authMiddleware, async (req, res) => {
 });
 
 // API route for uploading profile image for student profile page
-router.post('/upload-profile-image-user', authMiddleware, imageUploadProfileUser.single('image'), async (req, res) => {
-    if (!req.file) return res.status(400).send('No image uploaded');
+// Body: { email, imageUrl } - the image is uploaded to R2 first via /storage/presign
+router.post('/upload-profile-image-user', authMiddleware, async (req, res) => {
+    const { imageUrl } = req.body;
+    if (!imageUrl) return res.status(400).send('No image uploaded');
 
     try {
-        const imageUrl = req.file.path; // Cloudinary URL of the uploaded image
 
         // Update the instructor's profile with the image URL
         const userEmail = req.body.email;  // Assuming you are passing the instructor's email to identify them
@@ -346,19 +346,11 @@ router.post('/update-progress', authMiddleware, async (req, res) => {
       }
   
       // Generate the certificate
-      const certificatePath = await generateCertificate(user.name, courseTitle, completionDate);
-  
-      // Get the filename from the certificate path
-      const fileName = path.basename(certificatePath); // e.g. "John_Doe_CourseTitle_certificate.pdf"
-  
-      // Read the certificate file content into a buffer
-      const fs = require('fs');
-      const fileContent = fs.readFileSync(certificatePath);
-  
-      // Send both the filename and the PDF blob as part of the response
+      const { fileName, buffer } = await generateCertificate(user.name, courseTitle, completionDate);
+
       res.json({
         filename: fileName,
-        file: fileContent.toString('base64') // Convert the file to base64 string
+        file: buffer.toString('base64') // Convert the file to base64 string
       });
   
     } catch (error) {
