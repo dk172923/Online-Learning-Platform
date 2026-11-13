@@ -30,3 +30,4 @@ server/certificates/*.pdf
 *.njsproj
 *.sln
 *.sw?
+.vercel
